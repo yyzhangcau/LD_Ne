@@ -8,18 +8,82 @@
     <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
     <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+    <script type="text/javascript"
+      src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+    </script>
   </head>
   <body>
     <section class="page-header">
-      <h1 class="project-name">Ld ne</h1>
-      <h2 class="project-tagline">estimate recombination rate from LD and the known map length of the chromosomes, estimate Ne based on recombination rate</h2>
+      <h1 class="project-name">Ld Ne</h1>
+      <h2 class="project-tagline">Estimate recombination rate from LD and the known map length of the chromosomes, estimate Ne based on recombination rate</h2>
       <a href="https://github.com/geneticswithme/LD_Ne" class="btn">View on GitHub</a>
       <a href="https://github.com/geneticswithme/LD_Ne/zipball/master" class="btn">Download .zip</a>
       <a href="https://github.com/geneticswithme/LD_Ne/tarball/master" class="btn">Download .tar.gz</a>
     </section>
 
     <section class="main-content">
-      <p>estimate recombination rate from LD and the known map length of the chromosomes, estimate Ne based on recombination rate</p>
+      <p>Estimate recombination rate from LD and the known map length of the chromosomes, estimate Ne based on recombination rate</p>
+      <p>This is an example of how to estimate recombination rate(c) in sheep genome with the OvineSNP50 BeadChip data. And then, estimate the effective population size(Ne) based on the recombination rate.</p>
+      <p>We conduct estimation of recombination rate using the method described by Tenesa et. al(2007). The main thoughts of this method is based on a famouse equations describing the relationship of Ne and E(r2).</p>
+      $$
+      E(r^2) \approx \frac{1}{\alpha + kN_ec}
+      $$
+      Taking both experimental and evolutionary sampling effects into account, the relationship between LD and Ne.
+      <span >\[E(r^2)=\frac{1}{\alpha+kN_ec}+\frac{1}{n}\]</span>
+
+      <h2><b>Tutorial</b></h2>
+
+      <h3>1 Calculate LD using Haploview</h3>
+      <code>   
+      plink --bfile example --recode HV 
+      </code>
+      <p>This command will generate a serie of input files for Haploview.  
+        <br>plink.chr-1.ped, plink.chr-1.info; plink.chr-2.ped, plink.chr-2.info; ...</br></p>
+
+      <p> 
+        <code type="bash">
+          java -jar Haploview.jar -pedfile plink.chr-1.ped -info plink.chr-1.info -dprime </code>
+        <br><font size="3">output file <b>plink.chr-1.ped.LD</b> has columns 
+        [1] SNP1_name [2] SNP2_name [3] D. [4] LOD [5] r.2 [6] CIlow [7] CIhi [8] Dist [9] T.list</font>
+        <br>
+      </p>
+
+      <h3>2 import R functions</h3>
+      <p>open R console</p>
+<pre><code class="R">source("LD_Ne.R")</code></pre>
+      
+
+<h3>3 prepare input dataframe</h3>
+<br>map.txt has columns [1]CHR [2]SNP_name [3]BP</br>
+<br>cm_map.txt recodes chromosome length of linkage map and physical map. it has columns [1]CHR [2]linkage length of chr [3]physical length of chr</br>
+
+<pre><code>input="plink.chr-1.ped.LD"
+LD_df<-read.table(input,header=T,sep="\t")[,c(1,2,5)]
+map<-read.table("map.txt")
+SNP1_pos<-map[match(LD_df[,1],map[,2]),3]
+SNP2_pos<-map[match(LD_df[,2],map[,2]),3]
+LD_matrix<-cbind(LD_df,SNP1_pos,SNP2_pos, (SNP2_pos-SNP1_pos)/1000000)
+cm_map<-read.table("cm_map.txt")</code></pre>
+<p><b>LD_matrix</b> has columns [1] SNP1_name [2] SNP2_name [3] r.2 [4] SNP1_pos [5] SNP2_pos [6]Dist in Mb
+</p>
+
+<h3>4 calculate average beta on the whole chromosome</h3>
+<code>global_beta<-nls_model(LD_matrix,alpha=1)</code>
+<h3>5 Calculate recombinate rate along chromosome with windown size=500kb, overlap=1/2 * window_size</h3>    
+<code>c_out<-calculate_theta(LD_matrix, window_size=500000,alpha=1,map=cm_map,chr=1)</code>
+<code>write.table(c_out,file="chr1.cr.txt",sep="\t",quote=F,row.names=F)</code>
+<p><b>chr1.cr.txt</b>has columns[1] physical distance [2] Number of SNP pairs [3]beta 4 estimate of combination rate(cM)</p>
+<h3>6 Plot recombination rate</h3>
+<pre><code>for (i in 1:length(c_out[,1])){
+  c_out[i,5]=sum(c_out[1:i,4]/2)
+}
+chr=1
+chr_genetic_L=cm_map[chr,1]
+chr_physical_L=cm_map[chr,2]
+plot(c_out[,5],axes=FALSE,xlab="chromosome Length(Mb)",ylab="cM")
+axis(2,at=c(seq(0,chr_genetic_L,20)))
+axis(1,at=c(seq(0,length(c_out[,1]),20)),labels=paste0(seq(0,chr_physical_L,5)))
+</code></pre>
 
       <footer class="site-footer">
         <span class="site-footer-owner"><a href="https://github.com/geneticswithme/LD_Ne">Ld ne</a> is maintained by <a href="https://github.com/geneticswithme">geneticswithme</a>.</span>
