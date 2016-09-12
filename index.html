@@ -57,33 +57,35 @@
 <br>map.txt has columns [1]CHR [2]SNP_name [3]BP</br>
 <br>cm_map.txt recodes chromosome length of linkage map and physical map. it has columns [1]CHR [2]linkage length of chr [3]physical length of chr</br>
 
-<pre><code>input="plink.chr-1.ped.LD"
-LD_df<-read.table(input,header=T,sep="\t")[,c(1,2,5)]
-map<-read.table("map.txt")
-SNP1_pos<-map[match(LD_df[,1],map[,2]),3]
-SNP2_pos<-map[match(LD_df[,2],map[,2]),3]
-LD_matrix<-cbind(LD_df,SNP1_pos,SNP2_pos, (SNP2_pos-SNP1_pos)/1000000)
-cm_map<-read.table("cm_map.txt")</code></pre>
+<pre><code>input="plink.chr-23.ped.LD"
+input_LD<-read.table(input,header=T,sep="\t")
+physical_map<-read.table("SNP.map")
+linkage_map<-read.table("sheep_chr_cM.txt",header=T)
+L1_pos<-physical_map[match(input_LD[,"L1"],physical_map[,2]),4]
+L2_pos<-physical_map[match(input_LD[,"L2"],physical_map[,2]),4]
+LD_matrix<-cbind(input_LD[,1:2],input_LD[,5]-1/n,L1_pos,L2_pos,input_LD[,8])
+LD_df=LD_matrix
+LD_df[,6]<-LD_matrix[,6]/1000000
+colnames(LD_df)<-c("L1","L2","r2","L1_pos","L2_pos","dist")</code></pre>
 <p><b>LD_matrix</b> has columns [1] SNP1_name [2] SNP2_name [3] r.2 [4] SNP1_pos [5] SNP2_pos [6]Dist in Mb
 </p>
 
 <h3>4 calculate average beta on the whole chromosome</h3>
-<code>global_beta<-nls_model(LD_matrix,alpha=1)</code>
+<code>entire_chr_beta=beta_estimate(LD_df,alpha=1)
+entire_chr_beta</code>
 <h3>5 Calculate recombinate rate along chromosome with windown size=500kb, overlap=1/2 * window_size</h3>    
-<code>c_out<-calculate_theta(LD_matrix, window_size=500000,alpha=1,map=cm_map,chr=1)</code>
-<code>write.table(c_out,file="chr1.cr.txt",sep="\t",quote=F,row.names=F)</code>
-<p><b>chr1.cr.txt</b>has columns[1] physical distance [2] Number of SNP pairs [3]beta 4 estimate of combination rate(cM)</p>
+<code>out_c<-calculate_c_for_each_window(LD_df,window_size=500000,alpha=1,linkage_map=linkage_map,chr=23)
+c_map<-recombination_rate_accumulated_map(out_c)</code>
+
 <h3>6 Plot recombination rate</h3>
-<pre><code>for (i in 1:length(c_out[,1])){
-  c_out[i,5]=sum(c_out[1:i,4]/2)
-}
-chr=1
-chr_genetic_L=cm_map[chr,1]
-chr_physical_L=cm_map[chr,2]
-plot(c_out[,5],axes=FALSE,xlab="chromosome Length(Mb)",ylab="cM")
-axis(2,at=c(seq(0,chr_genetic_L,20)))
-axis(1,at=c(seq(0,length(c_out[,1]),20)),labels=paste0(seq(0,chr_physical_L,5)))
-</code></pre>
+<pre><code>chr=23
+chr_genetic_L=linkage_map[chr,2]
+chr_physical_L=linkage_map[chr,1]
+plot(x=c_map[,1],y=c_map[,2],main=paste0("chr",chr),axes=FALSE,xlab="chromosome length(Mb)",ylab="cM",type="l")
+y_axis=seq(0,chr_genetic_L,2)
+axis(2,at=y_axis)
+x_axis=seq(0,chr_physical_L*1000000,5000000)
+axis(1,at=x_axis,labels=paste0(x_axis/1000000) )</code></pre>
 
       <footer class="site-footer">
         <span class="site-footer-owner"><a href="https://github.com/geneticswithme/LD_Ne">Ld ne</a> is maintained by <a href="https://github.com/geneticswithme">geneticswithme</a>.</span>
